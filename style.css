@@ -1,0 +1,141 @@
+body {
+  font-family: "Plus Jakarta Sans", sans-serif;
+  background: #f4f7f9;
+  color: #2d3436;
+  padding-bottom: 50px;
+}
+
+.main-container {
+  max-width: 1350px;
+  margin-top: 20px;
+}
+
+/* Header Session & Batch Info */
+.session-card {
+  background: #ffffff;
+  border: 1px solid #e1e8ed;
+  border-radius: 12px;
+  padding: 10px 18px;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+}
+
+.session-icon-wrapper {
+  width: 45px;
+  height: 45px;
+  background: linear-gradient(
+    135deg,
+    rgba(78, 115, 223, 0.1) 0%,
+    rgba(108, 92, 231, 0.1) 100%
+  );
+  color: #4e73df;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.3rem;
+}
+
+.session-label {
+  font-size: 0.65rem;
+  font-weight: 800;
+  color: #95a5a6;
+  letter-spacing: 0.5px;
+  margin-bottom: 2px;
+}
+
+.session-value {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #2d3436;
+}
+
+.pulse-dot {
+  width: 7px;
+  height: 7px;
+  background-color: #00b894;
+  border-radius: 50%;
+  display: inline-block;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(0, 184, 148, 0.7);
+  }
+  70% {
+    box-shadow: 0 0 0 8px rgba(0, 184, 148, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(0, 184, 148, 0);
+  }
+}
+
+/* Cards & Components */
+.card {
+  border: none;
+  border-radius: 15px;
+  box-shadow: 0 5px 25px rgba(0, 0, 0, 0.05);
+  margin-bottom: 20px;
+}
+.card-header {
+  background: #fff;
+  font-weight: 700;
+  padding: 15px 20px;
+  border-bottom: 1px solid #f1f1f1;
+}
+
+.btn-process {
+  background: linear-gradient(135deg, #0984e3 0%, #6c5ce7 100%);
+  color: white;
+  border: none;
+  padding: 12px;
+  border-radius: 10px;
+  font-weight: 700;
+}
+
+#progressContainer {
+  display: none;
+  margin-bottom: 25px;
+}
+.progress {
+  height: 10px;
+  border-radius: 20px;
+}
+
+/* Tables */
+.product-table-container {
+  max-height: 450px;
+  overflow-y: auto;
+}
+.table-products {
+  font-size: 0.8rem !important;
+}
+.table-products thead {
+  position: sticky;
+  top: 0;
+  background: #f8f9fa;
+  z-index: 5;
+}
+
+.filename-badge {
+  background: #eef2ff;
+  color: #4e73df;
+  padding: 2px 6px;
+  border-radius: 4px;
+  border: 1px solid #d1d9ff;
+  font-size: 0.7rem;
+}
+
+#debugRawArea {
+  max-height: 250px;
+  overflow-y: auto;
+  font-family: monospace;
+  font-size: 11px;
+  background: #1e1e1e;
+  color: #d4d4d4;
+  padding: 15px;
+  border-radius: 10px;
+}
