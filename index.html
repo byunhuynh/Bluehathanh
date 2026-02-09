@@ -1,142 +1,591 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="vi">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hệ Thống Xử Lý Đơn Hàng</title>
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Google Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hệ Thống Xử Lý Đơn Hàng PDF - Real-time Processor</title>
+
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
     <style>
-        body { font-family: 'Inter', sans-serif; background-color: #f4f7f6; color: #333; }
-        .container { max-width: 900px; margin-top: 50px; }
-        .card { border: none; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-        .btn-primary { background-color: #4e73df; border: none; padding: 10px 25px; border-radius: 8px; }
-        .btn-success { background-color: #1cc88a; border: none; padding: 10px 25px; border-radius: 8px; }
-        .file-list { max-height: 200px; overflow-y: auto; background: #fff; border-radius: 8px; border: 1px solid #dee2e6; }
-        .status-badge { font-size: 0.85rem; padding: 5px 10px; }
-        #logTable { background: white; border-radius: 10px; overflow: hidden; }
-        .processing-anim { color: #4e73df; font-weight: bold; }
+      body {
+        font-family: "Plus Jakarta Sans", sans-serif;
+        background: #f4f7f9;
+        color: #2d3436;
+        padding-bottom: 50px;
+      }
+      .main-container {
+        max-width: 1300px;
+        margin-top: 20px;
+      }
+      /* Session Card Styles */
+      .session-card {
+        background: #ffffff;
+        border: 1px solid #e1e8ed;
+        border-radius: 12px;
+        padding: 10px 18px;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+        transition: all 0.3s ease;
+      }
+
+      .session-card:hover {
+        box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+        border-color: #4e73df;
+      }
+
+      .session-icon-wrapper {
+        width: 40px;
+        height: 40px;
+        background: rgba(78, 115, 223, 0.1);
+        color: #4e73df;
+        border-radius: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.2rem;
+      }
+
+      .session-details {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .session-label {
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: #95a5a6;
+        letter-spacing: 1px;
+        margin-bottom: -2px;
+        display: flex;
+        align-items: center;
+        gap: 5px;
+      }
+
+      .session-id-text {
+        font-size: 0.95rem;
+        font-weight: 700;
+        color: #2d3436;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      /* Hiệu ứng chấm xanh nhấp nháy */
+      .pulse-dot {
+        width: 6px;
+        height: 6px;
+        background-color: #00b894;
+        border-radius: 50%;
+        display: inline-block;
+        box-shadow: 0 0 0 rgba(0, 184, 148, 0.4);
+        animation: pulse 1.5s infinite;
+      }
+
+      @keyframes pulse {
+        0% {
+          box-shadow: 0 0 0 0 rgba(0, 184, 148, 0.7);
+        }
+        70% {
+          box-shadow: 0 0 0 8px rgba(0, 184, 148, 0);
+        }
+        100% {
+          box-shadow: 0 0 0 0 rgba(0, 184, 148, 0);
+        }
+      }
+
+      .copy-btn {
+        cursor: pointer;
+        color: #b2bec3;
+        font-size: 0.8rem;
+        transition: 0.2s;
+      }
+
+      .copy-btn:hover {
+        color: #4e73df;
+        transform: scale(1.2);
+      }
+      .card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+        margin-bottom: 20px;
+      }
+      .card-header {
+        background: #fff;
+        border-bottom: 1px solid #f1f1f1;
+        font-weight: 700;
+        padding: 15px 20px;
+      }
+
+      .btn-process {
+        background: linear-gradient(135deg, #0984e3 0%, #6c5ce7 100%);
+        color: white;
+        border: none;
+        padding: 12px;
+        border-radius: 10px;
+        font-weight: 700;
+        transition: 0.3s;
+      }
+
+      /* Progress Styles */
+      #progressContainer {
+        display: none;
+        margin-bottom: 20px;
+      }
+      .progress {
+        height: 12px;
+        border-radius: 10px;
+        background-color: #e9ecef;
+      }
+      .progress-bar {
+        transition: width 0.4s ease;
+        border-radius: 10px;
+      }
+
+      .table {
+        font-size: 0.85rem;
+      }
+      .folder-path {
+        color: #0984e3;
+        font-family: monospace;
+        background: #eef2ff;
+        padding: 2px 5px;
+        border-radius: 4px;
+      }
+      .page-badge {
+        background: #dfe6e9;
+        color: #2d3436;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 0.75rem;
+      }
+      #detailTableArea {
+        display: none;
+      }
+
+      .file-status-text {
+        font-size: 0.7rem;
+        font-weight: 600;
+        margin-right: 10px;
+      }
+      .status-waiting {
+        color: #6c757d;
+      }
+      .status-working {
+        color: #0984e3;
+      }
+      .status-success {
+        color: #00b894;
+      }
     </style>
-</head>
-<body>
-
-<div class="container">
-    <div class="text-center mb-5">
-        <h2 class="fw-bold text-primary">Quản Lý Đơn Hàng</h2>
-        <p class="text-muted">Đính kèm file PDF/TXT và nhấn xử lý để lưu vào hệ thống</p>
-    </div>
-
-    <div class="card p-4 mb-4">
-        <div class="row g-3 align-items-center">
-            <div class="col-md-8">
-                <label for="fileInput" class="form-label fw-semibold">Chọn tài liệu (PDF, TXT):</label>
-                <input class="form-control" type="file" id="fileInput" accept=".pdf,.txt" multiple>
+  </head>
+  <body>
+    <div class="container main-container">
+      <!-- Header -->
+      <div class="row align-items-center mb-4">
+        <div class="col-md-7">
+          <h3 class="fw-bold mb-1">
+            <i class="fa-solid fa-microchip text-primary me-2"></i>PDF Real
+            Processor
+          </h3>
+          <p class="text-muted small mb-0">
+            Xử lý dữ liệu thực tế và lưu trữ trực tiếp lên Drive
+          </p>
+        </div>
+        <div class="col-md-5 d-flex justify-content-end">
+          <div class="session-card">
+            <div class="session-icon-wrapper">
+              <i class="fa-solid fa-fingerprint"></i>
             </div>
-            <div class="col-md-4 d-grid mt-4">
-                <button class="btn btn-success" id="processBtn" disabled>
-                    <i class="bi bi-gear-fill"></i> Xử Lý Đơn Hàng
-                </button>
+            <div class="session-details text-start">
+              <div class="session-label">
+                <span class="pulse-dot"></span>
+                ACTIVE SESSION
+              </div>
+              <div class="session-id-text">
+                <span id="displaySessionID">---</span>
+                <i
+                  class="fa-regular fa-copy copy-btn"
+                  title="Sao chép ID"
+                  onclick="copySessionID()"
+                ></i>
+              </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Global Loading Bar -->
+      <div id="progressContainer">
+        <div class="d-flex justify-content-between mb-1">
+          <span class="small fw-bold text-primary" id="progressText"
+            >Đang chuẩn bị...</span
+          >
+          <span class="small fw-bold text-primary" id="progressPercent"
+            >0%</span
+          >
+        </div>
+        <div class="progress">
+          <div
+            id="mainProgressBar"
+            class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+            role="progressbar"
+            style="width: 0%"
+          ></div>
+        </div>
+      </div>
+
+      <div class="row">
+        <!-- Panel bên trái: Upload -->
+        <div class="col-lg-4">
+          <div class="card">
+            <div class="card-header">Tải tệp PDF</div>
+            <div class="card-body">
+              <input
+                type="file"
+                id="fileInput"
+                class="form-control mb-3"
+                accept=".pdf"
+                multiple
+              />
+              <div
+                class="d-flex justify-content-between mb-2 small fw-bold text-muted"
+              >
+                <span>DANH SÁCH CHỜ</span>
+                <span id="fileCount">0 file</span>
+              </div>
+              <div
+                id="fileListDisplay"
+                style="
+                  max-height: 300px;
+                  overflow-y: auto;
+                  border: 1px solid #eee;
+                  border-radius: 8px;
+                  padding: 10px;
+                "
+              >
+                <div class="text-center text-muted py-4 small">
+                  Chưa chọn file
+                </div>
+              </div>
+              <button
+                class="btn btn-process w-100 mt-3"
+                id="processBtn"
+                disabled
+              >
+                <i class="fa-solid fa-play me-2"></i> BẮT ĐẦU XỬ LÝ
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div class="mt-4">
-            <h6 class="fw-semibold">Danh sách file đã đính kèm:</h6>
-            <ul id="fileListDisplay" class="list-group file-list">
-                <li class="list-group-item text-muted text-center italic">Chưa có file nào được chọn</li>
-            </ul>
-        </div>
-    </div>
-
-    <!-- Bảng trạng thái -->
-    <div class="card p-4 shadow-sm">
-        <h5 class="mb-3 fw-bold">Quá Trình Thực Hiện & Lưu Trữ</h5>
-        <div class="table-responsive">
-            <table class="table table-hover border" id="logTable">
-                <thead class="table-light">
+        <!-- Panel bên phải: Log lưu trữ -->
+        <div class="col-lg-8">
+          <div class="card">
+            <div class="card-header">Lịch sử Lưu trữ (Drive Storage Logs)</div>
+            <div class="card-body p-0">
+              <div class="table-responsive" style="max-height: 310px">
+                <table class="table table-hover align-middle mb-0">
+                  <thead>
                     <tr>
-                        <th>Thời gian</th>
-                        <th>Tên File</th>
-                        <th>Thư mục lưu</th>
-                        <th>Trạng thái</th>
+                      <th class="ps-3">Thời gian</th>
+                      <th>Batch</th>
+                      <th>Tên file</th>
+                      <th>Đường dẫn lưu trữ</th>
                     </tr>
-                </thead>
-                <tbody id="logBody">
-                    <!-- Dữ liệu sẽ xuất hiện ở đây -->
-                </tbody>
-            </table>
+                  </thead>
+                  <tbody id="storageLogBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
+
+      <!-- Bảng kết quả chi tiết -->
+      <div class="row" id="detailTableArea">
+        <div class="col-12">
+          <div class="card">
+            <div class="card-header bg-white">
+              <i class="fa-solid fa-list me-2"></i>Dữ liệu bóc tách chi tiết
+            </div>
+            <div class="card-body p-0">
+              <div class="table-responsive">
+                <table class="table table-bordered align-middle mb-0">
+                  <thead class="table-dark">
+                    <tr>
+                      <th class="ps-3">File nguồn</th>
+                      <th class="text-center">Số trang</th>
+                      <th>Hệ thống</th>
+                      <th>Mã khách hàng</th>
+                      <th>Số PO</th>
+                      <th>Đơn giá</th>
+                      <th>Kết quả</th>
+                    </tr>
+                  </thead>
+                  <tbody id="detailLogBody"></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
-</div>
 
-<script>
-    const fileInput = document.getElementById('fileInput');
-    const fileListDisplay = document.getElementById('fileListDisplay');
-    const processBtn = document.getElementById('processBtn');
-    const logBody = document.getElementById('logBody');
+    <script>
+      pdfjsLib.GlobalWorkerOptions.workerSrc =
+        "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-    let selectedFiles = [];
+      const GAS_WEB_APP_URL =
+        "https://script.google.com/macros/s/AKfycbz739LM8dmIafQL_ZCeSMf6ei0yTQmY4TO8ornE-jx_pB8tdfv0GWVKlj9NDSSSPQvy/exec";
+      const currentSessionID =
+        sessionStorage.getItem("WORK_SESSION_ID") ||
+        "SES-" + Math.random().toString(36).substring(2, 9).toUpperCase();
+      sessionStorage.setItem("WORK_SESSION_ID", currentSessionID);
+      document.getElementById("displaySessionID").innerText = currentSessionID;
 
-    // Lắng nghe sự kiện chọn file
-    fileInput.addEventListener('change', (e) => {
-        selectedFiles = Array.from(e.target.files);
+      const fileInput = document.getElementById("fileInput");
+      const fileListDisplay = document.getElementById("fileListDisplay");
+      const processBtn = document.getElementById("processBtn");
+      const storageLogBody = document.getElementById("storageLogBody");
+      const detailLogBody = document.getElementById("detailLogBody");
+      const detailTableArea = document.getElementById("detailTableArea");
+
+      const progressContainer = document.getElementById("progressContainer");
+      const mainProgressBar = document.getElementById("mainProgressBar");
+      const progressPercent = document.getElementById("progressPercent");
+      const progressText = document.getElementById("progressText");
+
+      let selectedFiles = [];
+
+      fileInput.addEventListener("change", (e) => {
+        selectedFiles = [...selectedFiles, ...Array.from(e.target.files)];
         renderFileList();
+      });
+
+      function renderFileList() {
+        document.getElementById("fileCount").innerText =
+          `${selectedFiles.length} file`;
         processBtn.disabled = selectedFiles.length === 0;
-    });
+        fileListDisplay.innerHTML = selectedFiles.length
+          ? selectedFiles
+              .map(
+                (file, index) => `
+            <div class="d-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded" id="file-item-${index}">
+                <span class="small text-truncate" style="max-width: 60%"><i class="fa-solid fa-file-pdf text-danger me-2"></i>${file.name}</span>
+                <div class="d-flex align-items-center">
+                    <span class="file-status-text status-waiting" id="status-text-${index}">Chờ...</span>
+                    <i class="fa-solid fa-times cursor-pointer text-muted" onclick="removeFile(${index})" id="remove-icon-${index}"></i>
+                </div>
+            </div>
+        `,
+              )
+              .join("")
+          : `<div class="text-center text-muted py-4 small">Chưa chọn file</div>`;
+      }
 
-    function renderFileList() {
-        if (selectedFiles.length === 0) {
-            fileListDisplay.innerHTML = '<li class="list-group-item text-muted text-center italic">Chưa có file nào được chọn</li>';
-            return;
-        }
-        fileListDisplay.innerHTML = selectedFiles.map(file => `
-            <li class="list-group-item d-flex justify-content-between align-items-center">
-                ${file.name} 
-                <span class="badge bg-secondary rounded-pill">${(file.size / 1024).toFixed(2)} KB</span>
-            </li>
-        `).join('');
-    }
-
-    // Xử lý khi bấm nút "Xử Lý Đơn Hàng"
-    processBtn.addEventListener('click', async () => {
-        processBtn.disabled = true;
-        processBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Đang xử lý...';
-
-        for (const file of selectedFiles) {
-            await simulateProcessing(file);
-        }
-
-        processBtn.innerHTML = 'Xử Lý Đơn Hàng';
-        processBtn.disabled = false;
-        fileInput.value = ''; // Reset input
-        selectedFiles = [];
+      function removeFile(index) {
+        selectedFiles.splice(index, 1);
         renderFileList();
-    });
+      }
 
-    function simulateProcessing(file) {
-        return new Promise((resolve) => {
-            const time = new Date().toLocaleTimeString();
-            
-            // 1. Thêm dòng "Đang xử lý" vào bảng
-            const row = document.createElement('tr');
-            row.innerHTML = `
-                <td>${time}</td>
-                <td>${file.name}</td>
-                <td>/orders/</td>
-                <td><span class="badge bg-warning text-dark">Đang kết nối...</span></td>
-            `;
-            logBody.prepend(row);
-
-            // 2. Giả lập độ trễ xử lý 1.5 giây
-            setTimeout(() => {
-                row.cells[3].innerHTML = `<span class="badge bg-success">Thành công (Đã lưu)</span>`;
-                row.classList.add('table-success');
-                resolve();
-            }, 1500);
+      const toBase64 = (file) =>
+        new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.readAsDataURL(file);
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = (error) => reject(error);
         });
-    }
-</script>
 
-</body>
+      /** LOGIC XỬ LÝ CHÍNH **/
+      processBtn.addEventListener("click", async () => {
+        const filesToProcess = [...selectedFiles];
+        const totalFiles = filesToProcess.length;
+
+        // UI chuẩn bị
+        storageLogBody.innerHTML = "";
+        detailLogBody.innerHTML = "";
+        detailTableArea.style.display = "block";
+        progressContainer.style.display = "block";
+        processBtn.disabled = true;
+        fileInput.disabled = true;
+
+        const batchID = "B-" + Date.now().toString().slice(-6);
+        const folderDate = new Date().toISOString().split("T")[0];
+
+        for (let i = 0; i < totalFiles; i++) {
+          const file = filesToProcess[i];
+          const fileIdx = i;
+
+          try {
+            // Cập nhật Progress tổng
+            updateProgress(i, totalFiles, `Đang xử lý: ${file.name}`);
+
+            // Cập nhật trạng thái file cá nhân: Bước 1 - Upload
+            updateFileStatus(
+              fileIdx,
+              "Đang tải lên Drive...",
+              "status-working",
+              "fa-spinner fa-spin",
+            );
+
+            const base64Data = await toBase64(file);
+            await fetch(GAS_WEB_APP_URL, {
+              method: "POST",
+              mode: "no-cors",
+              body: JSON.stringify({
+                dateStr: folderDate,
+                sessionId: currentSessionID,
+                batchId: batchID,
+                fileName: file.name,
+                fileData: base64Data,
+              }),
+            });
+            addStorageLog(file.name, batchID, folderDate);
+
+            // Bước 2 - Đọc PDF
+            updateFileStatus(
+              fileIdx,
+              "Đang bóc tách PDF...",
+              "status-working",
+              "fa-file-magnifying-glass fa-beat",
+            );
+            await processPdf(file);
+
+            // Bước 3 - Xong
+            updateFileStatus(
+              fileIdx,
+              "Hoàn tất",
+              "status-success",
+              "fa-check-circle",
+            );
+          } catch (err) {
+            console.error(err);
+            updateFileStatus(
+              fileIdx,
+              "Lỗi!",
+              "text-danger",
+              "fa-exclamation-triangle",
+            );
+          }
+        }
+
+        // Kết thúc
+        updateProgress(totalFiles, totalFiles, "Tất cả đã hoàn thành!");
+        setTimeout(() => {
+          // progressContainer.style.display = "none";
+          processBtn.disabled = false;
+          fileInput.disabled = false;
+          selectedFiles = [];
+          fileInput.value = "";
+          renderFileList();
+        }, 1500);
+      });
+
+      function updateProgress(current, total, text) {
+        const percent = Math.round((current / total) * 100);
+        mainProgressBar.style.width = percent + "%";
+        progressPercent.innerText = percent + "%";
+        progressText.innerText = text;
+      }
+
+      function updateFileStatus(idx, text, className, iconClass) {
+        const textElem = document.getElementById(`status-text-${idx}`);
+        const iconElem = document.getElementById(`remove-icon-${idx}`);
+        if (textElem) {
+          textElem.innerText = text;
+          textElem.className = `file-status-text ${className}`;
+        }
+        if (iconElem) {
+          iconElem.className = `fa-solid ${iconClass} ${className}`;
+          iconElem.onclick = null; // Vô hiệu hóa nút xóa khi đang chạy
+        }
+      }
+
+      function addStorageLog(fileName, batchID, folderDate) {
+        const row = storageLogBody.insertRow();
+        row.innerHTML = `
+          <td class="ps-3 text-muted small">${new Date().toLocaleTimeString()}</td>
+          <td><span class="badge bg-primary-subtle text-primary">${batchID}</span></td>
+          <td class="fw-bold">${fileName}</td>
+          <td><span class="folder-path">storage/.../${batchID}/</span></td>
+        `;
+      }
+
+      async function processPdf(file) {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+        for (let i = 1; i <= pdf.numPages; i++) {
+          const page = await pdf.getPage(i);
+          const extractedData = await extractRealData(page);
+          renderDetailRow(file.name, i, pdf.numPages, extractedData);
+        }
+      }
+
+      async function extractRealData(page) {
+        // TẠI ĐÂY BẠN VIẾT LOGIC THẬT
+        // const textContent = await page.getTextContent();
+        return {
+          system: "ERP System",
+          customer: "Chưa xác định",
+          po: "PO-CHECKING",
+          price: "0",
+          status: "Hoàn tất",
+        };
+      }
+
+      function renderDetailRow(fileName, pageIdx, totalPages, data) {
+        const row = detailLogBody.insertRow();
+        row.innerHTML = `
+          <td class="ps-3"><strong>${fileName}</strong></td>
+          <td class="text-center"><span class="page-badge">${pageIdx}/${totalPages}</span></td>
+          <td>${data.system}</td>
+          <td>${data.customer}</td>
+          <td class="fw-bold text-primary">${data.po}</td>
+          <td class="text-end fw-bold">${data.price}</td>
+          <td><span class="text-success"><i class="fa-solid fa-check-circle me-1"></i>${data.status}</span></td>
+        `;
+      }
+
+      function copySessionID() {
+        const sessionID = document.getElementById("displaySessionID").innerText;
+        const copyIcon = document.querySelector(".copy-btn");
+
+        navigator.clipboard
+          .writeText(sessionID)
+          .then(() => {
+            // 1. Thay đổi icon: Bỏ regular-copy, thêm solid-check
+            copyIcon.classList.remove("fa-regular", "fa-copy");
+            copyIcon.classList.add("fa-solid", "fa-check");
+            copyIcon.style.color = "#00b894"; // Màu xanh lá
+
+            // 2. Sau 2 giây đổi lại như cũ
+            setTimeout(() => {
+              copyIcon.classList.remove("fa-solid", "fa-check");
+              copyIcon.classList.add("fa-regular", "fa-copy");
+              copyIcon.style.color = "#b2bec3"; // Màu xám ban đầu
+            }, 2000);
+          })
+          .catch((err) => {
+            console.error("Không thể sao chép: ", err);
+          });
+      }
+    </script>
+  </body>
 </html>
