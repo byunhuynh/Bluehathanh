@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Xử Lý Đơn Hàng</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #f4f7f6; color: #333; }
+        .container { max-width: 900px; margin-top: 50px; }
+        .card { border: none; border-radius: 15px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
+        .btn-primary { background-color: #4e73df; border: none; padding: 10px 25px; border-radius: 8px; }
+        .btn-success { background-color: #1cc88a; border: none; padding: 10px 25px; border-radius: 8px; }
+        .file-list { max-height: 200px; overflow-y: auto; background: #fff; border-radius: 8px; border: 1px solid #dee2e6; }
+        .status-badge { font-size: 0.85rem; padding: 5px 10px; }
+        #logTable { background: white; border-radius: 10px; overflow: hidden; }
+        .processing-anim { color: #4e73df; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="text-center mb-5">
+        <h2 class="fw-bold text-primary">Quản Lý Đơn Hàng</h2>
+        <p class="text-muted">Đính kèm file PDF/TXT và nhấn xử lý để lưu vào hệ thống</p>
+    </div>
+
+    <div class="card p-4 mb-4">
+        <div class="row g-3 align-items-center">
+            <div class="col-md-8">
+                <label for="fileInput" class="form-label fw-semibold">Chọn tài liệu (PDF, TXT):</label>
+                <input class="form-control" type="file" id="fileInput" accept=".pdf,.txt" multiple>
+            </div>
+            <div class="col-md-4 d-grid mt-4">
+                <button class="btn btn-success" id="processBtn" disabled>
+                    <i class="bi bi-gear-fill"></i> Xử Lý Đơn Hàng
+                </button>
+            </div>
+        </div>
+
+        <div class="mt-4">
+            <h6 class="fw-semibold">Danh sách file đã đính kèm:</h6>
+            <ul id="fileListDisplay" class="list-group file-list">
+                <li class="list-group-item text-muted text-center italic">Chưa có file nào được chọn</li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Bảng trạng thái -->
+    <div class="card p-4 shadow-sm">
+        <h5 class="mb-3 fw-bold">Quá Trình Thực Hiện & Lưu Trữ</h5>
+        <div class="table-responsive">
+            <table class="table table-hover border" id="logTable">
+                <thead class="table-light">
+                    <tr>
+                        <th>Thời gian</th>
+                        <th>Tên File</th>
+                        <th>Thư mục lưu</th>
+                        <th>Trạng thái</th>
+                    </tr>
+                </thead>
+                <tbody id="logBody">
+                    <!-- Dữ liệu sẽ xuất hiện ở đây -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const fileListDisplay = document.getElementById('fileListDisplay');
+    const processBtn = document.getElementById('processBtn');
+    const logBody = document.getElementById('logBody');
+
+    let selectedFiles = [];
+
+    // Lắng nghe sự kiện chọn file
+    fileInput.addEventListener('change', (e) => {
+        selectedFiles = Array.from(e.target.files);
+        renderFileList();
+        processBtn.disabled = selectedFiles.length === 0;
+    });
+
+    function renderFileList() {
+        if (selectedFiles.length === 0) {
+            fileListDisplay.innerHTML = '<li class="list-group-item text-muted text-center italic">Chưa có file nào được chọn</li>';
+            return;
+        }
+        fileListDisplay.innerHTML = selectedFiles.map(file => `
+            <li class="list-group-item d-flex justify-content-between align-items-center">
+                ${file.name} 
+                <span class="badge bg-secondary rounded-pill">${(file.size / 1024).toFixed(2)} KB</span>
+            </li>
+        `).join('');
+    }
+
+    // Xử lý khi bấm nút "Xử Lý Đơn Hàng"
+    processBtn.addEventListener('click', async () => {
+        processBtn.disabled = true;
+        processBtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Đang xử lý...';
+
+        for (const file of selectedFiles) {
+            await simulateProcessing(file);
+        }
+
+        processBtn.innerHTML = 'Xử Lý Đơn Hàng';
+        processBtn.disabled = false;
+        fileInput.value = ''; // Reset input
+        selectedFiles = [];
+        renderFileList();
+    });
+
+    function simulateProcessing(file) {
+        return new Promise((resolve) => {
+            const time = new Date().toLocaleTimeString();
+            
+            // 1. Thêm dòng "Đang xử lý" vào bảng
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${time}</td>
+                <td>${file.name}</td>
+                <td>/orders/</td>
+                <td><span class="badge bg-warning text-dark">Đang kết nối...</span></td>
+            `;
+            logBody.prepend(row);
+
+            // 2. Giả lập độ trễ xử lý 1.5 giây
+            setTimeout(() => {
+                row.cells[3].innerHTML = `<span class="badge bg-success">Thành công (Đã lưu)</span>`;
+                row.classList.add('table-success');
+                resolve();
+            }, 1500);
+        });
+    }
+</script>
+
+</body>
+</html>
