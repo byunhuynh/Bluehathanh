@@ -261,44 +261,52 @@ async function loadMasterData() {
   }
 }
 
-/** Sửa lại hàm render bảng để hiển thị Tên Gốc từ cột B */
 function renderProductsToSummary(fileName, products, pageNum) {
   if (globalProductCounter === 0) productSummaryBody.innerHTML = "";
 
   products.forEach((p) => {
     const row = productSummaryBody.insertRow();
 
-    // Tìm kiếm barcode trong bộ từ điển (quét từ F đến cuối đã làm ở Backend)
+    // Tìm kiếm barcode trong bộ từ điển MasterCatalog (đã tải từ Backend)
     const master = MasterCatalog[p.saleCd] || {
-      name: "KHÔNG TÌM THẤY",
+      name: `<span class="text-danger">MÃ MỚI: ${p.prodNm}</span>`, // Nếu ko thấy trong sheet thì hiện tên PDF để cảnh báo
       correctPrice: 0,
     };
 
     const pricePO = parseFloat(p.splyPrc.replace(/,/g, "")) || 0;
     const priceCorrect = parseFloat(master.correctPrice) || 0;
+
+    // Xác định hàng KM: Giá PO = 0 hoặc tên PDF có chữ KM
     const isPromo = pricePO === 0 || p.prodNm.toLowerCase().includes("km");
     const isPriceWrong = !isPromo && pricePO !== priceCorrect;
 
+    // Tô màu đỏ nhạt nếu sai giá
     if (isPriceWrong) row.style.backgroundColor = "#fff2f2";
+    // Tô màu xanh nhạt nếu là hàng KM
+    if (isPromo) row.style.backgroundColor = "#f0fff4";
 
     row.innerHTML = `
-            <td class="ps-3 sticky-col"><span class="filename-badge">${fileName} (P${pageNum})</span></td>
+            <td class="ps-3 sticky-col">
+                <span class="filename-badge">${fileName} (P${pageNum})</span>
+            </td>
             <td class="fw-bold">${p.saleCd}</td>
-            <td class="small text-muted">${p.prodNm}</td>
-            <td class="small fw-bold text-primary">${master.name}</td> <!-- Tên từ Cột B -->
+            <td class="small fw-bold text-dark">
+                ${master.name} 
+            </td>
             <td class="text-center fw-bold">${p.ordQty}</td>
             <td class="text-end">${pricePO.toLocaleString()}</td>
             <td class="text-end text-success fw-bold">${priceCorrect.toLocaleString()}</td>
             <td class="text-center">
                 ${isPromo ? '<span class="badge bg-success">KM</span>' : isPriceWrong ? '<span class="badge bg-danger">Sai giá</span>' : '<span class="badge bg-light text-dark">OK</span>'}
             </td>
-            <td class="text-end pe-3 fw-bold">${(pricePO * (parseFloat(p.ordQty) || 0)).toLocaleString()}</td>
+            <td class="text-end pe-3 fw-bold">
+                ${(pricePO * (parseFloat(p.ordQty) || 0)).toLocaleString()}
+            </td>
         `;
     globalProductCounter++;
   });
   totalProductCountLabel.innerText = `${globalProductCounter} items`;
 }
-
 function renderStatusRow(fileName, data, pageNum, totalPages) {
   const row = detailLogBody.insertRow();
   const rowId = `row-${fileName.replace(/\s+/g, "-")}-${pageNum}`;

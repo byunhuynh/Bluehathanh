@@ -172,3 +172,19 @@ body {
   background: white;
   z-index: 1;
 }
+
+/* Thêm vào cuối file style.css */
+.table-products th:nth-child(3),
+.table-products td:nth-child(3) {
+  min-width: 300px; /* Ưu tiên độ rộng cho cột tên sản phẩm */
+  white-space: normal; /* Cho phép xuống dòng nếu tên quá dài */
+}
+
+.table-products td {
+  vertical-align: middle;
+}
+
+.sticky-col {
+  background-color: #ffffff !important;
+  border-right: 2px solid #eee;
+}
