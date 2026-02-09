@@ -139,3 +139,36 @@ body {
   padding: 15px;
   border-radius: 10px;
 }
+
+/* Cho phép cuộn ngang bảng sản phẩm */
+.product-table-container {
+  max-height: 480px;
+  overflow-y: auto;
+  overflow-x: auto; /* Kích hoạt cuộn ngang */
+  border: 1px solid #eee;
+}
+
+.table-products {
+  min-width: 1000px; /* Ép bảng rộng hơn container để hiện thanh cuộn */
+  white-space: nowrap; /* Giữ chữ trên 1 dòng */
+}
+
+/* Định dạng các ô giá và trạng thái */
+.price-mismatch {
+  background-color: #fff5f5 !important;
+  color: #e74c3c;
+  font-weight: bold;
+}
+
+.promo-row {
+  background-color: #f0fff4 !important;
+  color: #27ae60;
+  font-style: italic;
+}
+
+.sticky-col {
+  position: sticky;
+  left: 0;
+  background: white;
+  z-index: 1;
+}

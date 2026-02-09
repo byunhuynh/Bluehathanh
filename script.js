@@ -6,14 +6,12 @@ pdfjsLib.GlobalWorkerOptions.workerSrc =
 const GAS_WEB_APP_URL =
   "https://script.google.com/macros/s/AKfycbz739LM8dmIafQL_ZCeSMf6ei0yTQmY4TO8ornE-jx_pB8tdfv0GWVKlj9NDSSSPQvy/exec";
 
-// Khởi tạo Session ID (Duy nhất mỗi lần mở trình duyệt)
 const currentSessionID =
   sessionStorage.getItem("WORK_SESSION_ID") ||
   "S-" + Math.random().toString(36).substring(2, 8).toUpperCase();
 sessionStorage.setItem("WORK_SESSION_ID", currentSessionID);
 document.getElementById("displaySessionID").innerText = currentSessionID;
 
-// Khai báo các thành phần giao diện (DOM)
 const fileInput = document.getElementById("fileInput");
 const fileListDisplay = document.getElementById("fileListDisplay");
 const processBtn = document.getElementById("processBtn");
@@ -29,8 +27,6 @@ const displayBatchID = document.getElementById("displayBatchID");
 let selectedFiles = [];
 let globalProductCounter = 0;
 
-// --- 2. QUẢN LÝ DANH SÁCH FILE ---
-
 fileInput.addEventListener("change", (e) => {
   selectedFiles = [...selectedFiles, ...Array.from(e.target.files)];
   renderFileList();
@@ -38,20 +34,18 @@ fileInput.addEventListener("change", (e) => {
 
 function renderFileList() {
   processBtn.disabled = selectedFiles.length === 0;
-  fileListDisplay.innerHTML = selectedFiles.length
-    ? selectedFiles
-        .map(
-          (file, idx) => `
+  fileListDisplay.innerHTML = selectedFiles
+    .map(
+      (file, idx) => `
         <div class="d-flex justify-content-between align-items-center mb-2 bg-light p-2 rounded">
             <span class="small text-truncate" style="max-width: 60%"><i class="fa-solid fa-file-pdf text-danger me-2"></i>${file.name}</span>
             <div class="d-flex align-items-center">
-                <span class="file-status-text status-waiting" id="status-text-${idx}">Chờ xử lý</span>
+                <span class="file-status-text status-waiting" id="status-text-${idx}">Chờ...</span>
                 <i class="fa-solid fa-times cursor-pointer text-muted" onclick="removeFile(${idx})" id="remove-icon-${idx}"></i>
             </div>
         </div>`,
-        )
-        .join("")
-    : `<div class="text-center text-muted py-5 small">Chưa chọn tệp tin</div>`;
+    )
+    .join("");
 }
 
 function removeFile(idx) {
@@ -67,14 +61,13 @@ const toBase64 = (file) =>
     reader.onerror = (err) => reject(err);
   });
 
-// --- 3. LUỒNG XỬ LÝ CHÍNH (FIX LỖI 405) ---
-
+/** 1. VÒNG LẶP ĐIỀU PHỐI CHÍNH **/
 processBtn.addEventListener("click", async () => {
+  await loadMasterData();
   const filesToProcess = [...selectedFiles];
   const currentBatchID = "B-" + Date.now().toString().slice(-6);
   const folderDate = new Date().toISOString().split("T")[0];
 
-  // Cập nhật giao diện khi bắt đầu
   displayBatchID.innerText = currentBatchID;
   productSummaryBody.innerHTML = "";
   detailLogBody.innerHTML = "";
@@ -89,7 +82,7 @@ processBtn.addEventListener("click", async () => {
     try {
       updateProgress(i, filesToProcess.length, `Đang xử lý: ${file.name}`);
 
-      // --- BƯỚC A: GỬI PDF & KHỞI TẠO DRIVE (Backend) ---
+      // Bước A: Tạo Folder/Sheet (1 file PDF gốc = 1 folder lưu trữ)
       updateFileStatus(
         i,
         "Khởi tạo Drive...",
@@ -97,11 +90,9 @@ processBtn.addEventListener("click", async () => {
         "fa-spinner fa-spin",
       );
       const b64 = await toBase64(file);
-
       const uploadRes = await fetch(GAS_WEB_APP_URL, {
         method: "POST",
-        mode: "cors",
-        headers: { "Content-Type": "text/plain;charset=utf-8" }, // Fix lỗi 405 tại đây
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
         body: JSON.stringify({
           action: "upload",
           dateStr: folderDate,
@@ -111,127 +102,112 @@ processBtn.addEventListener("click", async () => {
           fileData: b64,
         }),
       });
+      const { copyId } = await uploadRes.json();
 
-      if (!uploadRes.ok)
-        throw new Error("Server phản hồi lỗi " + uploadRes.status);
-      const uploadJson = await uploadRes.json();
-      const targetCopyId = uploadJson.copyId;
-
-      // --- BƯỚC B: BÓC TÁCH DỮ LIỆU PDF (Frontend) ---
+      // Bước B: Bóc tách PDF đa trang
       updateFileStatus(
         i,
-        "Bóc tách dữ liệu...",
+        "Đang đọc PDF...",
         "status-working",
         "fa-file-magnifying-glass fa-beat",
       );
-      const analyzedData = await extractPdfContent(file);
 
-      // Hiển thị dữ liệu lên bảng Summary và bảng Detail
-      renderProductsToSummary(file.name, analyzedData.productList);
-      renderStatusRow(file.name, analyzedData);
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
 
-      // --- BƯỚC C: GHI DỮ LIỆU VÀO SHEET (Backend) ---
-      if (analyzedData.productList.length > 0) {
-        updateFileStatus(
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+        updateProgress(
           i,
-          "Ghi vào Sheet...",
-          "status-working",
-          "fa-cloud-arrow-up",
+          filesToProcess.length,
+          `Xử lý ${file.name} - Trang ${pageNum}`,
         );
 
-        const saveRes = await fetch(GAS_WEB_APP_URL, {
-          method: "POST",
-          mode: "cors",
-          headers: { "Content-Type": "text/plain;charset=utf-8" }, // Fix lỗi 405 tại đây
-          body: JSON.stringify({
-            action: "saveData",
-            copyId: targetCopyId,
-            products: analyzedData.productList,
-            po: analyzedData.po,
-            customer: analyzedData.customer,
-          }),
-        });
+        const pageData = await extractPageData(pdf, pageNum, file.name);
 
-        const saveJson = await saveRes.json();
-        if (saveJson.status === "success") {
-          updateBackendStatusCell(
-            file.name,
-            `Đã ghi ${saveJson.rowCount} hàng`,
-          );
-          updateFileStatus(
-            i,
-            "Thành công!",
-            "status-success",
-            "fa-check-circle",
-          );
-        } else {
-          throw new Error(saveJson.message);
+        // Hiển thị sản phẩm lên UI
+        renderProductsToSummary(file.name, pageData.productList, pageNum);
+        renderStatusRow(file.name, pageData, pageNum, pdf.numPages);
+
+        // Bước C: Ghi dữ liệu từng trang vào Sheet tương ứng
+        if (pageData.productList.length > 0) {
+          const saveRes = await fetch(GAS_WEB_APP_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            body: JSON.stringify({
+              action: "saveData",
+              copyId: copyId,
+              products: pageData.productList,
+              po: pageData.po,
+              customer: pageData.customer,
+            }),
+          });
+          const saveJson = await saveRes.json();
+          if (saveJson.status === "success") {
+            updateBackendStatusCell(
+              file.name,
+              pageNum,
+              `Ghi ${saveJson.rowCount} hàng`,
+            );
+          }
         }
-      } else {
-        updateFileStatus(
-          i,
-          "PDF trống/Lỗi",
-          "text-danger",
-          "fa-triangle-exclamation",
-        );
       }
+      updateFileStatus(i, "Hoàn tất PDF", "status-success", "fa-check-circle");
     } catch (err) {
-      console.error("Lỗi chi tiết:", err);
-      updateFileStatus(i, "Lỗi kết nối!", "text-danger", "fa-circle-xmark");
-      // Ghi nhận lỗi vào bảng chi tiết để người dùng biết
-      const statusCell = document.querySelector(
-        `#detailLogBody tr[data-filename="${file.name}"] .status-col`,
-      );
-      if (statusCell)
-        statusCell.innerHTML = `<span class="text-danger small">${err.message}</span>`;
+      console.error(err);
+      updateFileStatus(i, "Lỗi!", "text-danger", "fa-circle-xmark");
     }
   }
-
   updateProgress(
     filesToProcess.length,
     filesToProcess.length,
-    "Hoàn thành lượt xử lý!",
+    "Hoàn thành Batch!",
   );
   processBtn.disabled = false;
-  fileInput.value = ""; // Reset input file
-  selectedFiles = []; // Xóa danh sách chờ
 });
 
-// --- 4. BỘ MÁY BÓC TÁCH ĐA HỆ THỐNG ---
-
-async function extractPdfContent(file) {
-  const buf = await file.arrayBuffer();
-  const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-  const page = await pdf.getPage(1);
+/** 2. HÀM ĐỌC DỮ LIỆU TỪNG TRANG **/
+async function extractPageData(pdf, pageNum, fileName) {
+  const page = await pdf.getPage(pageNum);
   const content = await page.getTextContent();
   const items = content.items.map((it) => it.str.trim());
 
-  // Hiển thị Debug Index
-  document.getElementById("debugRawArea").innerHTML = items
-    .map((it, idx) => (it !== "" ? `<div>[${idx}] ${it}</div>` : ""))
-    .join("");
+  // Hiển thị Debug cho trang hiện tại
+  document.getElementById("debugRawArea").innerHTML +=
+    `<div>--- TRANG ${pageNum} ---</div>` +
+    items
+      .map((it, idx) => (it !== "" ? `<div>[${idx}] ${it}</div>` : ""))
+      .join("");
 
-  // Nhận diện hệ thống (Factory Pattern)
-  const system = identifySystem(items, file.name);
+  const system = identifySystem(items);
+  let parsed = {
+    customer: "Chưa rõ",
+    custId: "---",
+    po: "N/A",
+    price: "0",
+    productList: [],
+  };
 
-  switch (system) {
-    case "LOTTE":
-      return parseLotte(items);
-    // Sau này bạn có thể thêm: case "AEON": return parseAeon(items);
-    default:
-      return {
-        customer: "Chưa nhận diện",
-        po: "N/A",
-        price: "0",
-        productList: [],
-        status: "Chưa hỗ trợ",
-      };
+  if (system === "LOTTE") {
+    parsed = parseLotte(items);
   }
+
+  // Kiểm tra giá (Logic mẫu: Nếu giá <= 0 thì coi là sai)
+  let wrongPriceCount = 0;
+  parsed.productList.forEach((p) => {
+    const val = parseFloat(p.splyPrc.replace(/,/g, "")) || 0;
+    if (val <= 0) wrongPriceCount++; // Bạn thay logic so sánh giá thật ở đây
+  });
+
+  parsed.priceCheck = {
+    total: parsed.productList.length,
+    wrong: wrongPriceCount,
+  };
+
+  return parsed;
 }
 
-function identifySystem(items, fileName) {
+function identifySystem(items) {
   const fullText = items.join(" ");
-  // Nhận diện Lotte qua Mã số thuế hoặc Từ khóa
   if (items.includes("0107889783") || fullText.includes("LOTTE MART"))
     return "LOTTE";
   return "UNKNOWN";
@@ -239,64 +215,117 @@ function identifySystem(items, fileName) {
 
 function parseLotte(items) {
   let products = [];
-  const anchorRegex = /^\d-\d{6}-\d{3}$/; // Mốc nhận diện mã hàng nội bộ Lotte
-
+  const anchorRegex = /^\d-\d{6}-\d{3}$/;
   for (let i = 0; i < items.length; i++) {
     if (anchorRegex.test(items[i])) {
       products.push({
-        saleCd: items[i + 2] || "N/A", // Barcode
-        uom: items[i + 7] || "0", // Quy cách (Ví dụ: 4)
-        ordQty: items[i + 11] || "0", // SL đặt (Ví dụ: 5)
-        splyPrc: items[i + 15] || "0", // Đơn giá
-        prodNm: (items[i + 4] || "") + " " + (items[i + 5] || ""), // Tên hàng ghép từ 2 dòng
+        saleCd: items[i + 2] || "N/A",
+        uom: items[i + 7] || "0",
+        ordQty: items[i + 11] || "0",
+        splyPrc: items[i + 15] || "0",
+        prodNm: (items[i + 4] || "") + " " + (items[i + 5] || ""),
       });
     }
   }
   return {
     customer: "LOTTE MART",
-    po: items[88] || "N/A", // PO Lotte ở index 88
-    price: items[274] || "0", // Tổng tiền thanh toán ở index 274
+    custId: "---", // Cập nhật sau
+    po: items[88] || "N/A",
+    price: items[274] || "0",
     productList: products,
   };
 }
 
-// --- 5. CÁC HÀM CẬP NHẬT GIAO DIỆN (UI) ---
+/** 3. HELPER UI FUNCTIONS **/
 
-function renderProductsToSummary(fileName, products) {
+let MasterCatalog = {}; // Bộ nhớ đệm danh mục
+
+/** Tải danh mục từ AppScript */
+async function loadMasterData() {
+  try {
+    const res = await fetch(GAS_WEB_APP_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "getMasterData" }),
+    });
+    const json = await res.json();
+    if (json.status === "success") {
+      MasterCatalog = json.data;
+      console.log(
+        "Hệ thống đã nạp " +
+          Object.keys(MasterCatalog).length +
+          " mã nhận diện.",
+      );
+    }
+  } catch (err) {
+    console.error("Lỗi tải danh mục:", err);
+  }
+}
+
+/** Sửa lại hàm render bảng để hiển thị Tên Gốc từ cột B */
+function renderProductsToSummary(fileName, products, pageNum) {
   if (globalProductCounter === 0) productSummaryBody.innerHTML = "";
+
   products.forEach((p) => {
     const row = productSummaryBody.insertRow();
+
+    // Tìm kiếm barcode trong bộ từ điển (quét từ F đến cuối đã làm ở Backend)
+    const master = MasterCatalog[p.saleCd] || {
+      name: "KHÔNG TÌM THẤY",
+      correctPrice: 0,
+    };
+
+    const pricePO = parseFloat(p.splyPrc.replace(/,/g, "")) || 0;
+    const priceCorrect = parseFloat(master.correctPrice) || 0;
+    const isPromo = pricePO === 0 || p.prodNm.toLowerCase().includes("km");
+    const isPriceWrong = !isPromo && pricePO !== priceCorrect;
+
+    if (isPriceWrong) row.style.backgroundColor = "#fff2f2";
+
     row.innerHTML = `
-            <td class="ps-3"><span class="filename-badge" title="${fileName}">${fileName}</span></td>
+            <td class="ps-3 sticky-col"><span class="filename-badge">${fileName} (P${pageNum})</span></td>
             <td class="fw-bold">${p.saleCd}</td>
-            <td class="small">${p.prodNm}</td>
-            <td class="text-center">${p.uom}</td>
-            <td class="text-center fw-bold text-primary">${p.ordQty}</td>
-            <td class="text-end pe-3">${p.splyPrc}</td>`;
+            <td class="small text-muted">${p.prodNm}</td>
+            <td class="small fw-bold text-primary">${master.name}</td> <!-- Tên từ Cột B -->
+            <td class="text-center fw-bold">${p.ordQty}</td>
+            <td class="text-end">${pricePO.toLocaleString()}</td>
+            <td class="text-end text-success fw-bold">${priceCorrect.toLocaleString()}</td>
+            <td class="text-center">
+                ${isPromo ? '<span class="badge bg-success">KM</span>' : isPriceWrong ? '<span class="badge bg-danger">Sai giá</span>' : '<span class="badge bg-light text-dark">OK</span>'}
+            </td>
+            <td class="text-end pe-3 fw-bold">${(pricePO * (parseFloat(p.ordQty) || 0)).toLocaleString()}</td>
+        `;
     globalProductCounter++;
   });
   totalProductCountLabel.innerText = `${globalProductCounter} items`;
 }
 
-function renderStatusRow(fileName, data) {
+function renderStatusRow(fileName, data, pageNum, totalPages) {
   const row = detailLogBody.insertRow();
-  row.setAttribute("data-filename", fileName);
+  const rowId = `row-${fileName.replace(/\s+/g, "-")}-${pageNum}`;
+  row.setAttribute("id", rowId);
+
+  const priceStatus =
+    data.priceCheck.wrong > 0
+      ? `<span class="badge bg-danger">${data.priceCheck.wrong}/${data.priceCheck.total} Sai giá</span>`
+      : `<span class="badge bg-success">OK</span>`;
+
   row.innerHTML = `
         <td class="ps-3"><strong>${fileName}</strong></td>
+        <td class="text-center"><span class="badge bg-secondary">${pageNum}/${totalPages}</span></td>
+        <td>${data.custId}</td>
         <td>${data.customer}</td>
         <td class="fw-bold text-primary">${data.po}</td>
         <td class="text-end fw-bold">${data.price}</td>
-        <td class="text-center status-col"><span class="text-muted small"><i class="fa-solid fa-spinner fa-spin me-2"></i>Đang ghi Sheet...</span></td>`;
+        <td class="text-center">${priceStatus}</td>
+        <td class="text-center status-col"><span class="text-muted small">Đang xử lý...</span></td>`;
 }
 
-function updateBackendStatusCell(fileName, msg) {
-  const row = document.querySelector(
-    `#detailLogBody tr[data-filename="${fileName}"]`,
-  );
-  if (row) {
+function updateBackendStatusCell(fileName, pageNum, msg) {
+  const rowId = `row-${fileName.replace(/\s+/g, "-")}-${pageNum}`;
+  const row = document.getElementById(rowId);
+  if (row)
     row.querySelector(".status-col").innerHTML =
       `<span class="badge bg-success"><i class="fa-solid fa-check me-1"></i>${msg}</span>`;
-  }
 }
 
 function updateProgress(curr, tot, txt) {
@@ -314,11 +343,4 @@ function updateFileStatus(idx, txt, cls, icon) {
     t.className = `file-status-text ${cls}`;
   }
   if (i) i.className = `fa-solid ${icon} ${cls}`;
-}
-
-function copySessionID() {
-  const id = document.getElementById("displaySessionID").innerText;
-  navigator.clipboard.writeText(id).then(() => {
-    alert("Đã sao chép Session ID: " + id);
-  });
 }
